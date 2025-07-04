@@ -9,6 +9,7 @@ import numpy as np
 import pickle
 from nltk import sent_tokenize
 from pathlib import Path
+import wandb
 
 
 def parse_arguments():
@@ -91,7 +92,7 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
     best_memory_params = None
     early_stopping_counter = 0
 
-    for _ in progress_bar:
+    for step in progress_bar:
         with torch.cuda.amp.autocast(dtype=dtype):
             out, mem = model_with_memory(**inp)
             loss = out.loss
@@ -114,6 +115,27 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
 
         progress_bar.set_postfix(loss=f"{current_loss:.4f}", best_loss=f"{best_loss:.4f}",
                                  best_acc=f"{best_accuracy:.4f}")
+
+        # wandb logging
+        wandb.log({
+            'step': step,
+            'loss': current_loss,
+            'accuracy': accuracy,
+            'best_loss': best_loss,
+            'best_accuracy': best_accuracy,
+            'orig_loss': orig_loss,
+            'orig_accuracy': orig_accuracy,
+            'N_mem_tokens': N_mem_tokens,
+            'max_length': max_length,
+            'sample_idx': sample_idx,
+            'run_idx': run_idx,
+            'model_name': model_name,
+            'lr': lr,
+            'beta_1': beta_1,
+            'beta_2': beta_2,
+            'weight_decay': weight_decay,
+            'shuffled': shuffled
+        })
 
         if best_accuracy == 1.0:
             break
@@ -152,6 +174,9 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
 
 def main():
     args = parse_arguments()
+
+    # wandb init
+    wandb.init(project="no_dencity_hidden_capacity_1", config=vars(args))
 
     print(f'model: {args.model_name}')
     print(f'mem: {args.N_mem_tokens}')
