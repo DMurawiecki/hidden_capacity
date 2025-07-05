@@ -49,7 +49,27 @@ def calculate_accuracy(logits, labels):
 def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations, sample_idx, run_idx,
                           model_name, dtype, use_flash_attention_2, device, tokenizer, lr, beta_1, beta_2,
                           weight_decay, early_stopping_patience=2000, shuffled=False):
-    # split text sample on two parts: prefix and main text
+    # Init wandb
+    wandb.init(
+        project="memory-compression",
+        name=f"run_{run_idx}_sample_{sample_idx}_mem_{N_mem_tokens}",
+        config={
+            "N_mem_tokens": N_mem_tokens,
+            "max_length": max_length,
+            "num_iterations": num_iterations,
+            "sample_idx": sample_idx,
+            "run_idx": run_idx,
+            "model_name": model_name,
+            "dtype": str(dtype),
+            "use_flash_attention_2": use_flash_attention_2,
+            "device": str(device),
+            "lr": lr,
+            "beta_1": beta_1,
+            "beta_2": beta_2,
+            "weight_decay": weight_decay,
+            "shuffled": shuffled,
+        }
+    )
     sentences = sent_tokenize(text_sample)
     # prefix can be used lately for compression analysis
     # prefix_text = ' '.join(sentences[:len(sentences)//2])
@@ -75,6 +95,7 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
             orig_output = model(**inp, labels=inp['input_ids'])
             orig_loss = orig_output.loss.item()
             orig_accuracy = calculate_accuracy(orig_output.logits, inp['input_ids'])
+    wandb.log({"original_loss": orig_loss, "original_accuracy": orig_accuracy})
 
     model = AutoModelForCausalLM.from_pretrained(model_name, use_flash_attention_2=use_flash_attention_2)
     memory_dim = getattr(model.config, 'word_embed_proj_dim', getattr(model.config, 'hidden_size'))
@@ -105,6 +126,14 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
         losses.append(current_loss)
         accuracies.append(accuracy)
 
+        wandb.log({
+            "step": step,
+            "loss": current_loss,
+            "accuracy": accuracy,
+            "best_accuracy": best_accuracy,
+            "best_loss": best_loss
+        })
+
         if best_accuracy < accuracy:
             best_loss = current_loss
             best_accuracy = accuracy
@@ -116,32 +145,19 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
         progress_bar.set_postfix(loss=f"{current_loss:.4f}", best_loss=f"{best_loss:.4f}",
                                  best_acc=f"{best_accuracy:.4f}")
 
-        # wandb logging
-        wandb.log({
-            'step': step,
-            'loss': current_loss,
-            'accuracy': accuracy,
-            'best_loss': best_loss,
-            'best_accuracy': best_accuracy,
-            'orig_loss': orig_loss,
-            'orig_accuracy': orig_accuracy,
-            'N_mem_tokens': N_mem_tokens,
-            'max_length': max_length,
-            'sample_idx': sample_idx,
-            'run_idx': run_idx,
-            'model_name': model_name,
-            'lr': lr,
-            'beta_1': beta_1,
-            'beta_2': beta_2,
-            'weight_decay': weight_decay,
-            'shuffled': shuffled
-        })
 
         if best_accuracy == 1.0:
             break
 
         if early_stopping_counter >= early_stopping_patience:
             break
+
+    wandb.log({
+        "final_best_accuracy": best_accuracy,
+        "final_best_loss": best_loss
+    })
+
+    wandb.finish()
 
     return {
         'losses': losses,
@@ -174,9 +190,6 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
 
 def main():
     args = parse_arguments()
-
-    # wandb init
-    wandb.init(project="no_dencity_hidden_capacity_1", config=vars(args))
 
     print(f'model: {args.model_name}')
     print(f'mem: {args.N_mem_tokens}')
