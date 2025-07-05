@@ -13,6 +13,7 @@ NUM_ITERATIONS=5000
 NUM_SAMPLES=50
 LR=1e-2
 WEIGHT_DECAY=0.01
+TARGET_MODULES=(q_proj v_proj)
 
 TEXTS_PATH=./data/fanfics_1k_chunks.csv
 SAVE_PATH=./runs_fanfics
@@ -31,3 +32,4 @@ python train.py \
     --weight_decay "$WEIGHT_DECAY" \
     --texts_path "$TEXTS_PATH" \
     --save_path "$SAVE_PATH"
+    --target_modules "${TARGET_MODULES[@]}"

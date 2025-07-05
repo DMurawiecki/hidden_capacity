@@ -267,6 +267,8 @@ dependencies:
       - tqdm==4.67.1
       - traitlets==5.14.3
       - transformers==4.51.3
+      - wandb==0.19.1
+      - peft==0.13.0
       - triton==3.2.0
       - typer==0.15.2
       - typing-extensions==4.12.2
