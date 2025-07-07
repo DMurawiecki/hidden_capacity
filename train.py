@@ -99,8 +99,10 @@ def run_single_experiment(lora_r, lora_alpha, text_sample, max_length, num_itera
     best_loss, best_accuracy, = float('inf'), 0
     best_lora_state = None
     early_stopping_counter = 0
+    iteration = 0
 
     for _ in progress_bar:
+        iteration += 1
         with torch.cuda.amp.autocast(dtype=dtype):
             out = model_with_lora(**inp)
             loss = out.loss
@@ -133,28 +135,17 @@ def run_single_experiment(lora_r, lora_alpha, text_sample, max_length, num_itera
             wandb.run.log({
                 'loss': current_loss,
                 'accuracy': accuracy,
-                'best_loss': best_loss,
-                'best_accuracy': best_accuracy,
-		'lora_r': lora_r,
-                'lora_alpha': lora_alpha,
-                'max_length': max_length,
-                'sample_idx': sample_idx,
-                'run_idx': run_idx,
-                'iteration': _,
+                'iteration': iteration,
             })
     if wandb.run:
         wandb.run.log({
             'final_best_loss': best_loss,
             'final_best_accuracy': best_accuracy,
-            'original_loss': orig_loss,
-            'original_accuracy': orig_accuracy,
-            'improvement_loss': orig_loss - best_loss,
-            'improvement_accuracy': best_accuracy - orig_accuracy,
         })
 
 
     return {
-	'losses': losses,
+	    'losses': losses,
         'accuracies': accuracies,
         'original_loss': orig_loss,
         'original_accuracy': orig_accuracy,
@@ -188,7 +179,7 @@ def run_single_experiment(lora_r, lora_alpha, text_sample, max_length, num_itera
 def main():
     args = parse_arguments()
     wandb.init(
-        project="hidden-capacity-lora",
+        project=args.project_name,
         config={
             "model_name": args.model_name,
             "lora_r": args.lora_r,
