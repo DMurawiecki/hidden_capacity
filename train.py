@@ -45,13 +45,24 @@ def calculate_accuracy(logits, labels):
     correct = (predictions == labels).float()
     return correct.mean().item()
 
+def setup_logging(save_path):
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(save_path / 'experiment.log'),
+            logging.StreamHandler()
+        ]
+    )
+    return logging.getLogger(__name__)
 
 def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations, sample_idx, run_idx,
-                          model_name, dtype, use_flash_attention_2, device, tokenizer, lr, beta_1, beta_2,
-                          weight_decay, early_stopping_patience=2000, shuffled=False):
+                              model_name, dtype, use_flash_attention_2, device, tokenizer, lr, beta_1, beta_2,
+                              weight_decay, early_stopping_patience=2000, shuffled=False, logger=None):
+
     # Init wandb
     wandb.init(
-        project="memory-compression",
+        project="no-density-experiment",
         name=f"run_{run_idx}_sample_{sample_idx}_mem_{N_mem_tokens}",
         config={
             "N_mem_tokens": N_mem_tokens,
@@ -70,18 +81,20 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
             "shuffled": shuffled,
         }
     )
+
+    if logger:
+        logger.info(f"Starting experiment with N_mem_tokens={N_mem_tokens}, max_length={max_length}, "
+                    f"sample_idx={sample_idx}, run_idx={run_idx}")
+
     sentences = sent_tokenize(text_sample)
-    # prefix can be used lately for compression analysis
-    # prefix_text = ' '.join(sentences[:len(sentences)//2])
-    # suffix is compressed
-    suffix_text = ' '.join(sentences[len(sentences)//2:])
+    suffix_text = ' '.join(sentences[len(sentences) // 2:])
 
     if shuffled:
         vocab = []
         with open('./data/vocab_100k.txt') as fin:
             for line in fin:
                 vocab += [line.strip()]
-        max_length = np.random.randint(2, max_length+1)
+        max_length = np.random.randint(2, max_length + 1)
         suffix_text = ' '.join(np.random.choice(vocab, size=max_length * 5))
         inp = tokenizer(suffix_text, max_length=max_length, truncation=True, return_tensors='pt').to(device)
     else:
@@ -95,6 +108,10 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
             orig_output = model(**inp, labels=inp['input_ids'])
             orig_loss = orig_output.loss.item()
             orig_accuracy = calculate_accuracy(orig_output.logits, inp['input_ids'])
+
+    if logger:
+        logger.info(f"Original loss: {orig_loss:.4f}, Original accuracy: {orig_accuracy:.4f}")
+
     wandb.log({"original_loss": orig_loss, "original_accuracy": orig_accuracy})
 
     model = AutoModelForCausalLM.from_pretrained(model_name, use_flash_attention_2=use_flash_attention_2)
@@ -112,6 +129,7 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
     best_loss, best_accuracy, = float('inf'), 0
     best_memory_params = None
     early_stopping_counter = 0
+    log_interval = max(1, num_iterations // 100)  # Логируем примерно 100 раз за эксперимент
 
     for step in progress_bar:
         with torch.cuda.amp.autocast(dtype=dtype):
@@ -126,6 +144,7 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
         losses.append(current_loss)
         accuracies.append(accuracy)
 
+        # Логирование на каждой итерации в WandB
         wandb.log({
             "step": step,
             "loss": current_loss,
@@ -133,6 +152,12 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
             "best_accuracy": best_accuracy,
             "best_loss": best_loss
         })
+
+        # Логирование в консоль и файл через регулярные интервалы
+        if step % log_interval == 0 and logger:
+            logger.info(f"Iteration {step}/{num_iterations}: "
+                        f"Loss={current_loss:.4f}, Accuracy={accuracy:.4f}, "
+                        f"Best Loss={best_loss:.4f}, Best Accuracy={best_accuracy:.4f}")
 
         if best_accuracy < accuracy:
             best_loss = current_loss
@@ -145,19 +170,24 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
         progress_bar.set_postfix(loss=f"{current_loss:.4f}", best_loss=f"{best_loss:.4f}",
                                  best_acc=f"{best_accuracy:.4f}")
 
-
         if best_accuracy == 1.0:
+            if logger:
+                logger.info("Early stopping as perfect accuracy reached")
             break
 
         if early_stopping_counter >= early_stopping_patience:
+            if logger:
+                logger.info(f"Early stopping after {early_stopping_patience} iterations without improvement")
             break
 
     wandb.log({
         "final_best_accuracy": best_accuracy,
         "final_best_loss": best_loss
     })
-
     wandb.finish()
+
+    if logger:
+        logger.info(f"Experiment completed. Best loss: {best_loss:.4f}, Best accuracy: {best_accuracy:.4f}")
 
     return {
         'losses': losses,
@@ -191,12 +221,23 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
 def main():
     args = parse_arguments()
 
-    print(f'model: {args.model_name}')
-    print(f'mem: {args.N_mem_tokens}')
-    print(f'len: {args.max_length}')
+    # Создаем уникальную папку для этого запуска
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_folder = f"run_{timestamp}"
+    if args.shuffled:
+        run_folder += "_shuffled"
+
+    # Базовый путь для сохранения
+    base_save_path = Path(args.save_path) / args.model_name / run_folder
+    base_save_path.mkdir(parents=True, exist_ok=True)
+
+    # Настройка логирования
+    logger = setup_logging(base_save_path)
+
+    logger.info(f"Starting experiment with parameters:\n{args}")
+    logger.info(f"Results will be saved to: {base_save_path}")
 
     df = pd.read_csv(args.texts_path, index_col=0)
-
     device = 'cuda'
     dtype = getattr(torch, args.dtype)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
@@ -207,37 +248,49 @@ def main():
     total_experiments = len(args.max_length) * len(args.N_mem_tokens) * len(samples) * num_runs
     overall_progress = tqdm(total=total_experiments, desc="Overall Progress", position=0)
 
+    # Сохраняем промежуточные результаты каждые N экспериментов
+    save_interval = max(1, len(samples) // 10)  # Сохраняем примерно 10 раз за полный проход
+
     for max_length in args.max_length:
         for N_mem_tokens in args.N_mem_tokens:
-
             if N_mem_tokens > max_length:
                 continue
 
             aggregated_results = []
-
-            save_path = Path(f'./{args.save_path}/{args.model_name}')
-            if not args.shuffled:
-                save_path = save_path / f'mem_{N_mem_tokens}_len_{max_length}.pkl'
-            else:
-                save_path = save_path / f'mem_{N_mem_tokens}_len_{max_length}_rnd_vocab_100k.pkl'
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            print(f'save_path: {save_path}')
+            save_path = base_save_path / f'mem_{N_mem_tokens}_len_{max_length}.pkl'
 
             if save_path.exists():
-                print(f'loading previous results from {save_path}')
+                logger.info(f'Loading previous results from {save_path}')
                 aggregated_results = pickle.load(open(save_path, 'rb'))
 
             for sample_idx, sample in enumerate(samples):
                 for run in range(num_runs):
-                    result = run_single_experiment(N_mem_tokens, sample, max_length, args.num_iterations, sample_idx,
-                                                   run, args.model_name, dtype, args.use_flash_attention_2, device,
-                                                   tokenizer, args.lr, args.beta_1, args.beta_2, args.weight_decay,
-                                                   args.early_stopping_patience, args.shuffled)
+                    result = run_single_experiment(
+                        N_mem_tokens, sample, max_length, args.num_iterations, sample_idx,
+                        run, args.model_name, dtype, args.use_flash_attention_2, device,
+                        tokenizer, args.lr, args.beta_1, args.beta_2, args.weight_decay,
+                        args.early_stopping_patience, args.shuffled, logger
+                    )
                     aggregated_results.append(result)
                     overall_progress.update(1)
-                    pickle.dump(aggregated_results, open(save_path, 'wb'))
+
+                    # Периодическое сохранение промежуточных результатов
+                    if sample_idx % save_interval == 0:
+                        pickle.dump(aggregated_results, open(save_path, 'wb'))
+                        logger.info(f"Intermediate results saved to {save_path}")
+
+            # Финальное сохранение после завершения всех samples
+            pickle.dump(aggregated_results, open(save_path, 'wb'))
+            logger.info(f"Final results for mem={N_mem_tokens}, len={max_length} saved to {save_path}")
 
     overall_progress.close()
+
+    # Сохраняем аргументы запуска
+    args_dict = vars(args)
+    args_save_path = base_save_path / 'run_args.pkl'
+    pickle.dump(args_dict, open(args_save_path, 'wb'))
+    logger.info(f'Run arguments saved to: {args_save_path}')
+    logger.info("All experiments completed successfully")
 
 
 if __name__ == "__main__":
