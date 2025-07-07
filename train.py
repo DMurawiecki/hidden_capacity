@@ -130,6 +130,7 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
     best_memory_params = None
     early_stopping_counter = 0
     log_interval = max(1, num_iterations // 100)  # Логируем примерно 100 раз за эксперимент
+    reconstruction_log_interval = max(1, num_iterations // 25)
 
     for step in progress_bar:
         with torch.cuda.amp.autocast(dtype=dtype):
@@ -158,6 +159,12 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
             logger.info(f"Iteration {step}/{num_iterations}: "
                         f"Loss={current_loss:.4f}, Accuracy={accuracy:.4f}, "
                         f"Best Loss={best_loss:.4f}, Best Accuracy={best_accuracy:.4f}")
+        if step % reconstruction_log_interval == 0 and logger:
+            # Получаем реконструированный текст
+            preds = torch.argmax(out.logits, dim=-1)
+            reconstructed_text = tokenizer.decode(preds[0], skip_special_tokens=True)
+            logger.info(f"Reconstructed text at iteration {step}: {reconstructed_text[:500]}")  # первые 500 символов
+            wandb.log({f"reconstructed_text_step_{step}": reconstructed_text[:500]})
 
         if best_accuracy < accuracy:
             best_loss = current_loss
@@ -179,6 +186,11 @@ def run_single_experiment(N_mem_tokens, text_sample, max_length, num_iterations,
             if logger:
                 logger.info(f"Early stopping after {early_stopping_patience} iterations without improvement")
             break
+
+    preds = torch.argmax(out.logits, dim=-1)
+    final_reconstructed_text = tokenizer.decode(preds[0], skip_special_tokens=True)
+    logger.info(f"Final reconstructed text: {final_reconstructed_text[:1000]}")
+    wandb.log({"final_reconstructed_text": final_reconstructed_text[:1000]})
 
     wandb.log({
         "final_best_accuracy": best_accuracy,
