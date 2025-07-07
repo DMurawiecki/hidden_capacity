@@ -10,8 +10,11 @@ class MemoryCell(torch.nn.Module):
         self.model = base_model
         self.memory_dim = memory_dim
         self.num_mem_tokens = num_mem_tokens
+        self.dense_dim = dense_dim
         for n, p in self.model.named_parameters():
             p.requires_grad = False
+
+        self.memory_density = torch.nn.Linear(memory_dim, dense_dim)
         self.create_memory()
 
     def create_memory(self):
@@ -21,7 +24,9 @@ class MemoryCell(torch.nn.Module):
         self.read_memory_position = range(self.num_mem_tokens)
 
     def set_memory(self, input_shape):
-        memory = self.memory.repeat(input_shape[0], 1, 1)
+        # расширяем память по batch_size
+        memory = self.memory.repeat(input_shape[0], 1, 1)  # (batch, num_mem_tokens, memory_dim)
+        memory = self.memory_density(memory)  # (batch, num_mem_tokens, dense_dim)
         return memory
 
     def forward(self, input_ids, memory_state=None, **kwargs):
