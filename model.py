@@ -10,8 +10,7 @@ class MemoryCell(torch.nn.Module):
         self.model = base_model
         self.memory_dim = memory_dim
         self.num_mem_tokens = num_mem_tokens
-        for n, p in self.model.named_parameters():
-            p.requires_grad = False
+
         self.create_memory()
 
     def create_memory(self):
