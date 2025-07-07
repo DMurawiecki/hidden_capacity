@@ -197,6 +197,7 @@ def evaluate_one_epoch(model, dataloader, device="cuda"):
     print(f"Val Loss: {avg_loss:.4f}, Val Acc: {accuracy:.4f}")
     return avg_loss, accuracy
 
+
 def save_model(model, path="vae_model.pt"):
     torch.save(model.state_dict(), path)
     print(f"Model saved to {path}")
@@ -209,78 +210,121 @@ def load_model(model, path="vae_model.pt", device="cuda"):
     print(f"Model loaded from {path}")
     return model
 
-
-def prepare_dataset(dataset_name: str = "deepmind/pg19", cache_dir: str = "data_cache"):
-    """Load and preprocess the dataset, optionally caching it."""
-    cache_file = Path(cache_dir) / "pg19_processed.pkl"
+def prepare_dataset(
+    dataset_name: str = "deepmind/pg19",
+    cache_dir: str = "data_cache",
+    chunk_size: int = 8,
+    n_chunks: int = 1000,
+):
+    """
+    Извлекает из датасета n_chunks кусков ровно по chunk_size токенов.
+    Кэшируется в cache_dir/pg19_token_chunks.pkl
+    """
+    cache_file = Path(cache_dir) / f"pg19_token_chunks_{chunk_size}.pkl"
     if cache_file.exists():
-        print("Loading cached dataset...")
-        with open(cache_file, "rb") as f:
-            return pickle.load(f)
-    print("Processing dataset...")
-    ds = datasets.load_dataset(dataset_name)
-    texts = []
-    min_chunk_size = 10
-    for _ in tqdm(range(1000), desc="Sampling texts"):
-        n_words = 0
-        while n_words < 12000:
-            text = random.choice(ds['validation'])['text']
-            n_words = len(text.split())
-        chunk = get_random_chunk(text, min_chunk_size)
-        texts.append(chunk)
-    # Cache the processed data
+        print("Loading cached token chunks...")
+        return pickle.load(open(cache_file, "rb"))
+
+    print("Processing token chunks...")
+    ds = datasets.load_dataset(dataset_name, split="validation")
+    tokenizer = AutoTokenizer.from_pretrained("EleutherAI/pythia-160m")
+
+    chunks = []
+    for _ in tqdm(range(n_chunks), desc="Sampling token chunks"):
+        # Берём случайный документ и токенизируем его без truncation
+        text = random.choice(ds)["text"]
+        ids = tokenizer.encode(text, add_special_tokens=False)
+
+        if len(ids) < chunk_size:
+            continue  # если слишком коротко — пропускаем и повторяем
+
+        # Выбираем случайное окно длины chunk_size
+        start = random.randint(0, len(ids) - chunk_size)
+        chunk_ids = ids[start : start + chunk_size]
+
+        # Декодируем обратно в текст
+        chunk_text = tokenizer.decode(chunk_ids, clean_up_tokenization_spaces=True)
+        chunks.append(chunk_text)
+
+    # Кэшируем результат
     cache_file.parent.mkdir(exist_ok=True)
     with open(cache_file, "wb") as f:
-        pickle.dump(texts, f)
-    return texts
+        pickle.dump(chunks, f)
+
+    return chunks
+
 
 
 if __name__ == "__main__":
+    # Initialize W&B
     wandb.init(project='vae_training_experiment')
 
     # Configuration
     device = "cuda" if torch.cuda.is_available() else "cpu"
     batch_size = 4
 
-    # Load and preprocess data (ваша функция)
-    texts = prepare_dataset()    # Всё, что возвращает prepare_dataset, используется для train+val
+    # 1) Load and preprocess data
+    texts = prepare_dataset(chunk_size=8, n_chunks=1000)
 
-    # Initialize model
+    # 2) Split into train / val
+    random.shuffle(texts)
+    split = int(0.8 * len(texts))
+    train_texts = texts[:split]
+    val_texts   = texts[split:]
+
+    # 3) Initialize model and ensure padding token
     vae = PythiaVAE().to(device)
-    # Ensure padding token exists
     if vae.tokenizer.pad_token is None:
         vae.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        # resize both embedding matrices if your VAE has separate encoder/decoder
+        vae.encoder.resize_token_embeddings(len(vae.tokenizer))
+        vae.decoder.resize_token_embeddings(len(vae.tokenizer))
 
-    # Tokenize and create DataLoader
-    encodings = vae.tokenizer(
-        texts,
+    # 4) Tokenize train and val separately
+    train_enc = vae.tokenizer(
+        train_texts,
         return_tensors="pt",
         padding=True,
         truncation=True,
-        max_length=512,
+        max_length=8,
+        add_special_tokens=False
     )
-    dataset = TensorDataset(encodings['input_ids'], encodings['attention_mask'])
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    val_enc = vae.tokenizer(
+        val_texts,
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=8,
+        add_special_tokens=False
+    )
 
-    # Test forward pass
-    test_batch = next(iter(dataloader))
+    # 5) Create TensorDatasets and DataLoaders
+    train_ds = TensorDataset(train_enc["input_ids"], train_enc["attention_mask"])
+    val_ds   = TensorDataset(  val_enc["input_ids"],   val_enc["attention_mask"])
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+    val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
+
+    # 6) Quick sanity-check forward pass
+    test_batch = next(iter(train_loader))
     input_ids, attention_mask = [t.to(device) for t in test_batch]
     out = vae(input_ids=input_ids, attention_mask=attention_mask)
     print("Test Forward Pass:", out)
 
-    # Training setup
+    # 7) Training setup
     optimizer = torch.optim.AdamW(vae.parameters(), lr=5e-5)
-
-    # Обучение с эвалюацией (на том же датасете, т.к. он один)
     best_loss = float('inf')
     num_epochs = 3000
 
     for epoch in range(num_epochs):
         print(f"\nEpoch {epoch + 1}")
-        train_one_epoch(vae, dataloader, optimizer, device)
-        val_loss, val_acc = evaluate_one_epoch(vae, dataloader, device)  # эвалюация на том же наборе
 
-        # Save best model
+        # — Training on train_loader
+        train_one_epoch(vae, train_loader, optimizer, device)
+
+        # — Validation on val_loader
+        val_loss, val_acc = evaluate_one_epoch(vae, val_loader, device)
+
+        # — Save best model
         if val_loss < best_loss:
             best_loss = val_loss
             save_model(vae, path="best_vae_model.pt")

@@ -230,80 +230,96 @@ def prepare_dataset(
     return chunks
 
 if __name__ == "__main__":
-    wandb.init(project='AutoEncoder_training_experiment')
+    # Initialize W&B
+    wandb.init(project="AutoEncoder_training_experiment")
 
     # Configuration
     device = "cuda" if torch.cuda.is_available() else "cpu"
     batch_size = 4
 
-    # Load and preprocess data
+    # 1) Load and preprocess data
     texts = prepare_dataset()
 
-    # Initialize model
+    # 2) Split into train / val
+    random.shuffle(texts)
+    split = int(0.8 * len(texts))
+    train_texts = texts[:split]
+    val_texts   = texts[split:]
+
+    # 3) Initialize model and rescale embeddings if needed
     ae = PythiaAE().to(device)
     if ae.tokenizer.pad_token is None:
         ae.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+        ae.encoder.resize_token_embeddings(len(ae.tokenizer))
+        ae.decoder.resize_token_embeddings(len(ae.tokenizer))
 
-    # Tokenize and create DataLoader
-    encodings = ae.tokenizer(
-        texts,
+    # 4) Tokenize train and val separately
+    train_enc = ae.tokenizer(
+        train_texts,
         return_tensors="pt",
         padding=True,
         truncation=True,
         max_length=512,
+        add_special_tokens=False
     )
-    dataset = TensorDataset(encodings['input_ids'], encodings['attention_mask'])
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    val_enc = ae.tokenizer(
+        val_texts,
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=512,
+        add_special_tokens=False
+    )
 
+    # 5) Create TensorDatasets and DataLoaders
+    train_ds = TensorDataset(train_enc["input_ids"], train_enc["attention_mask"])
+    val_ds   = TensorDataset(  val_enc["input_ids"],   val_enc["attention_mask"])
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+    val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
+
+    # 6) Optimizer and training loop setup
     optimizer = torch.optim.AdamW(ae.parameters(), lr=5e-5)
-    best_loss = float('inf')
+    best_loss = float("inf")
     num_epochs = 3000
 
     for epoch in range(num_epochs):
         print(f"\nEpoch {epoch + 1}")
-        # 1) Тренировочный шаг
-        train_one_epoch(ae, dataloader, optimizer, device)
 
-        # 2) Валидация
-        val_loss, val_acc = evaluate_one_epoch(ae, dataloader, device)
+        # — Training on train_loader
+        train_one_epoch(ae, train_loader, optimizer, device)
 
-        # 3) Логика сохранения лучшей модели
+        # — Validation on val_loader
+        val_loss, val_acc = evaluate_one_epoch(ae, val_loader, device)
+
+        # — Save best model
         if val_loss < best_loss:
             best_loss = val_loss
             save_model(ae, path="best_ae_model.pt")
 
-        # 4) Логирование всех реконструкций текущего состояния модели
+        # — Log a few reconstructions from the validation set
         ae.eval()
         table = wandb.Table(columns=["original", "reconstruction"])
         with torch.no_grad():
-            for input_ids, attention_mask in tqdm(dataloader, desc="Logging reconstructions"):
+            for input_ids, attention_mask in tqdm(val_loader, desc="Logging reconstructions"):
                 input_ids = input_ids.to(device)
                 attention_mask = attention_mask.to(device)
-                out = ae(input_ids=input_ids, attention_mask=attention_mask)
 
-                # Берём логиты и убираем латент-токен
+                out = ae(input_ids=input_ids, attention_mask=attention_mask)
                 logits = out["logits"][:, 1:, :]
                 preds = torch.argmax(logits, dim=-1)
 
-                # Декодируем в текст
                 originals = [ae.tokenizer.decode(ids.cpu(), skip_special_tokens=True)
                              for ids in input_ids]
-                recons    = [ae.tokenizer.decode(p.cpu(), skip_special_tokens=True)
-                             for p in preds]
+                recons    = [ae.tokenizer.decode(p.cpu(),   skip_special_tokens=True)
+                             for p   in preds]
 
                 for o, r in zip(originals, recons):
                     table.add_data(o, r)
 
-        # Отправляем в W&B как "reconstructions_epoch"
         wandb.log({
             "val_loss": val_loss,
             "val_accuracy": val_acc,
             f"reconstructions_epoch_{epoch+1}": table
         })
 
-        # Переключаемся обратно в train-режим
         ae.train()
-
-
-
-
