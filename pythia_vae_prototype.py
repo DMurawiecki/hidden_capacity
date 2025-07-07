@@ -328,3 +328,31 @@ if __name__ == "__main__":
         if val_loss < best_loss:
             best_loss = val_loss
             save_model(vae, path="best_vae_model.pt")
+
+        # — Log a few reconstructions from the validation set
+        vae.eval()
+        table = wandb.Table(columns=["original", "reconstruction"])
+        with torch.no_grad():
+            for input_ids, attention_mask in tqdm(val_loader, desc="Logging reconstructions"):
+                input_ids = input_ids.to(device)
+                attention_mask = attention_mask.to(device)
+
+                out = vae(input_ids=input_ids, attention_mask=attention_mask)
+                logits = out["logits"][:, 1:, :]
+                preds = torch.argmax(logits, dim=-1)
+
+                originals = [vae.tokenizer.decode(ids.cpu(), skip_special_tokens=True)
+                             for ids in input_ids]
+                recons    = [vae.tokenizer.decode(p.cpu(),   skip_special_tokens=True)
+                             for p   in preds]
+
+                for o, r in zip(originals, recons):
+                    table.add_data(o, r)
+
+        wandb.log({
+            "val_loss": val_loss,
+            "val_accuracy": val_acc,
+            f"reconstructions_epoch_{epoch+1}": table
+        })
+
+        vae.train()
