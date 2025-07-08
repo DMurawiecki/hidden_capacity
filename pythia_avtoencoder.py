@@ -189,13 +189,10 @@ def load_model(model, path="vae_model.pt", device="cuda"):
 def prepare_dataset(
     dataset_name: str = "deepmind/pg19",
     cache_dir: str = "data_cache",
-    chunk_size: int = 8,
+    chunk_size: int = 256,      
     n_chunks: int = 1000,
 ):
-    """
-    Извлекает из датасета n_chunks кусков ровно по chunk_size токенов.
-    Кэшируется в cache_dir/pg19_token_chunks.pkl
-    """
+    from nltk import sent_tokenize
     cache_file = Path(cache_dir) / f"pg19_token_chunks_{chunk_size}.pkl"
     if cache_file.exists():
         print("Loading cached token chunks...")
@@ -207,27 +204,24 @@ def prepare_dataset(
 
     chunks = []
     for _ in tqdm(range(n_chunks), desc="Sampling token chunks"):
-        # Берём случайный документ и токенизируем его без truncation
         text = random.choice(ds)["text"]
-        ids = tokenizer.encode(text, add_special_tokens=False)
+        sentences = sent_tokenize(text)
+        random.shuffle(sentences)
+        chunk = ''
+        for sent in sentences:
+            if len(tokenizer.encode(chunk + sent, add_special_tokens=False)) < chunk_size:
+                chunk += ' ' + sent
+            else:
+                break
+        if len(chunk.strip()) < 50:
+            continue
+        chunks.append(chunk.strip())
 
-        if len(ids) < chunk_size:
-            continue  # если слишком коротко — пропускаем и повторяем
-
-        # Выбираем случайное окно длины chunk_size
-        start = random.randint(0, len(ids) - chunk_size)
-        chunk_ids = ids[start : start + chunk_size]
-
-        # Декодируем обратно в текст
-        chunk_text = tokenizer.decode(chunk_ids, clean_up_tokenization_spaces=True)
-        chunks.append(chunk_text)
-
-    # Кэшируем результат
     cache_file.parent.mkdir(exist_ok=True)
     with open(cache_file, "wb") as f:
         pickle.dump(chunks, f)
-
     return chunks
+
 
 if __name__ == "__main__":
     # Initialize W&B
@@ -323,3 +317,4 @@ if __name__ == "__main__":
         })
 
         ae.train()
+
