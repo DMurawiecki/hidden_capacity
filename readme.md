@@ -1,7 +1,7 @@
 # Exploring Language Models Embeddings Space Capacity
 This repository contains our experiments with LLM context compression on AIRI 2025 Summer School
 
-![picture](путь/до/изображения.png)
+![picture](hidden_capacity/images/imgg.png)
 
 ## Scripts
 - `scripts/run.*.sh` - bash scripts for different models, they include running experiments on PG-19, fanfics, and random texts with single or multiple trainable input `[mem]` vectors.
