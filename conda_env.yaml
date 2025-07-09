@@ -1,4 +1,4 @@
-name: myenv
+name: /home/jovyan/kuratov/envs/py311_pt2.6_cu12.4
 channels:
   - nvidia/label/cuda-12.4.1
   - conda-forge
