@@ -38,6 +38,12 @@ conda env create -n my_env -f conda_env.yaml
 conda activate my_env
 
 ```
+To run Dense Experiment:
+
+```bash
+python pythia_dense.py
+```
+
 To run Autoencoder:
 
 ```bash
