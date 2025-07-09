@@ -38,10 +38,14 @@ conda env create -n my_env -f conda_env.yaml
 conda activate my_env
 
 ```
-To run AE/VAE training pipelines:
+To run Autoencoder:
 
 ```bash
 python pythia_avtoencoder.py
+```
+To run Variational Autoencoder:
+
+```bash
 python pythia_vae2.py
 ```
 
