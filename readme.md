@@ -29,7 +29,7 @@ cd ./data
 This script will fetch the required texts and place them in the `./data` folder.
 
 ## Run pipelines
-### Downloading Preprocessed Data
+This section describes how to run our code
 
 To setup:
 
