@@ -1,4 +1,4 @@
-# Leveraging LLM Embeddings Space Capacity(Dense, LoRA, AE/VAE approaches)
+# LLM Context compression
 This repository contains our experiments with LLM context compression on AIRI 2025 Summer School
 
 ![picture](images/imgg.png)
