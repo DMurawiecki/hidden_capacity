@@ -1,0 +1,61 @@
+{
+  "os":  "Linux-5.15.0-131-generic-x86_64-with-glibc2.35",
+  "python":  "CPython 3.11.11",
+  "startedAt":  "2025-07-09T19:51:35.448641Z",
+  "program":  "/home/user38/user38_projects/sosi/hidden_capacity/pythia_dense.py",
+  "codePath":  "pythia_dense.py",
+  "codePathLocal":  "pythia_dense.py",
+  "git":  {
+    "remote":  "https://github.com/DMurawiecki/hidden_capacity.git",
+    "commit":  "4e728038a8f059acc9e56815643e61f2e64ca73f"
+  },
+  "email":  "progaymer1977@gmail.com",
+  "root":  "/home/user38/user38_projects/sosi/hidden_capacity",
+  "host":  "sc-08",
+  "executable":  "/home/user38/.conda/envs/density/bin/python",
+  "cpu_count":  16,
+  "cpu_count_logical":  16,
+  "gpu":  "Tesla V100-SXM3-32GB",
+  "gpu_count":  4,
+  "disk":  {
+    "/":  {
+      "total":  "1056749920256",
+      "used":  "150017486848"
+    }
+  },
+  "memory":  {
+    "total":  "270258163712"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "Tesla V100-SXM3-32GB",
+      "memoryTotal":  "34359738368",
+      "cudaCores":  5120,
+      "architecture":  "Volta",
+      "uuid":  "GPU-14f0050a-cefa-bcb3-a14d-75b8b8f9b853"
+    },
+    {
+      "name":  "Tesla V100-SXM3-32GB",
+      "memoryTotal":  "34359738368",
+      "cudaCores":  5120,
+      "architecture":  "Volta",
+      "uuid":  "GPU-2b29a3f4-6fe5-28d4-fb4e-7d0829b7983d"
+    },
+    {
+      "name":  "Tesla V100-SXM3-32GB",
+      "memoryTotal":  "34359738368",
+      "cudaCores":  5120,
+      "architecture":  "Volta",
+      "uuid":  "GPU-c54d089b-9d4f-7d2c-97f9-c3eee0c5e6c8"
+    },
+    {
+      "name":  "Tesla V100-SXM3-32GB",
+      "memoryTotal":  "34359738368",
+      "cudaCores":  5120,
+      "architecture":  "Volta",
+      "uuid":  "GPU-4ab643f8-bb58-c64b-c160-9c9b20b7c1ee"
+    }
+  ],
+  "cudaVersion":  "12.4",
+  "writerId":  "46o0h0zvm0jeb1kxsw9mla61tgc2cmh6"
+}

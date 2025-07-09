@@ -1,0 +1,104 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            ql6k5qgoju3sei3hx6d5mj87a7x8ggip:
+                codePath: pythia_dense.py
+                codePathLocal: pythia_dense.py
+                cpu_count: 16
+                cpu_count_logical: 16
+                cudaVersion: "12.4"
+                disk:
+                    /:
+                        total: "1056749920256"
+                        used: "150018772992"
+                email: progaymer1977@gmail.com
+                executable: /home/user38/.conda/envs/density/bin/python
+                git:
+                    commit: 4e728038a8f059acc9e56815643e61f2e64ca73f
+                    remote: https://github.com/DMurawiecki/hidden_capacity.git
+                gpu: Tesla V100-SXM3-32GB
+                gpu_count: 4
+                gpu_nvidia:
+                    - architecture: Volta
+                      cudaCores: 5120
+                      memoryTotal: "34359738368"
+                      name: Tesla V100-SXM3-32GB
+                      uuid: GPU-14f0050a-cefa-bcb3-a14d-75b8b8f9b853
+                    - architecture: Volta
+                      cudaCores: 5120
+                      memoryTotal: "34359738368"
+                      name: Tesla V100-SXM3-32GB
+                      uuid: GPU-2b29a3f4-6fe5-28d4-fb4e-7d0829b7983d
+                    - architecture: Volta
+                      cudaCores: 5120
+                      memoryTotal: "34359738368"
+                      name: Tesla V100-SXM3-32GB
+                      uuid: GPU-c54d089b-9d4f-7d2c-97f9-c3eee0c5e6c8
+                    - architecture: Volta
+                      cudaCores: 5120
+                      memoryTotal: "34359738368"
+                      name: Tesla V100-SXM3-32GB
+                      uuid: GPU-4ab643f8-bb58-c64b-c160-9c9b20b7c1ee
+                host: sc-08
+                memory:
+                    total: "270258163712"
+                os: Linux-5.15.0-131-generic-x86_64-with-glibc2.35
+                program: /home/user38/user38_projects/sosi/hidden_capacity/pythia_dense.py
+                python: CPython 3.11.11
+                root: /home/user38/user38_projects/sosi/hidden_capacity
+                startedAt: "2025-07-09T19:54:12.651899Z"
+                writerId: ql6k5qgoju3sei3hx6d5mj87a7x8ggip
+        m: []
+        python_version: 3.11.11
+        t:
+            "1":
+                - 1
+                - 11
+                - 49
+                - 71
+            "2":
+                - 1
+                - 11
+                - 41
+                - 49
+                - 71
+            "3":
+                - 2
+                - 13
+                - 16
+            "4": 3.11.11
+            "5": 0.21.0
+            "6": 4.51.3
+            "12": 0.21.0
+            "13": linux-x86_64
+N_mem_tokens:
+    value: 1
+beta_1:
+    value: 0.9
+beta_2:
+    value: 0.9
+dense_dim:
+    value: null
+device:
+    value: cuda
+dtype:
+    value: torch.float32
+lr:
+    value: 0.01
+max_length:
+    value: 8
+model_name:
+    value: EleutherAI/pythia-160m
+num_iterations:
+    value: 5000
+run_idx:
+    value: 0
+sample_idx:
+    value: 0
+shuffled:
+    value: false
+use_flash_attention_2:
+    value: false
+weight_decay:
+    value: 0.01
