@@ -1,34 +1,12 @@
 # Exploring Language Models Embeddings Space Capacity
+This repository contains our experiments with LLM context compression on AIRI 2025 Summer School
 
-This repository contains code and notebooks used in experiments and to make plots for the paper:
-
-Kuratov, Y., Arkhipov, M., Bulatov, A., Burtsev, M., "Cramming 1568 Tokens into a Single Vector and Back Again: Exploring the Limits of Embedding Space Capacity", ACL 2025.
-
-This work was done in collaboration of AIRI, DeepPavlov.ai, and London Institute for Mathematical Sciences.
-
-Our experiments show that a single Llama-3.1-8B input vector can compress and subsequently decode text sequences of over 1,500 tokens. Moreover, this capacity increases nearly linearly when multiple vectors are used.
-
-<p align="center">
-  <img src="./notebooks/imgs/compression_schema.png" width="45%" />
-  <img src="./notebooks/imgs/results_brief.png" width="45%" />
-</p>
-
-**Left**: Compressing text into a `[mem]` vector. The pre-trained LLM is frozen, and we only finetune one or multiple `[mem]` vectors to decode the sequence of tokens $[t_1, t_2, \ldots, t_N]$. `[mem]` vectors are trained for each text separately.
-
-**Right**: How many tokens fit into a single input vector? We estimate maximum number of tokens that can be decoded from a single input vector across various language models
-
-## Updates
-- **5 Jun 2025**: Released [v2](https://arxiv.org/abs/2506.02610v2), the camera-ready version of the paper accepted to **ACL 2025** (main track). Added results for Mamba (130m, 370m, 790m, 1.4b) models and added the discussion of how our work relates to entropy coders
-- **15 May 2025**: Our paper was accepted to **ACL 2025** (main track)!
-- **18 Feb 2025**: Released the arXiv preprint [v1](https://arxiv.org/abs/2502.13063v1)
-
-## Python scripts
-- `train.py` - implements training loop for text compression into a vector.
-- `model.py` - implementation of wrapper that adds trainable input vectors referred as `[mem]` to any model from HF, it is based on Recurrent Memory Transformer (RMT) [implementation](https://github.com/booydar/recurrent-memory-transformer).
-
+![picture](путь/до/изображения.png)
 
 ## Scripts
 - `scripts/run.*.sh` - bash scripts for different models, they include running experiments on PG-19, fanfics, and random texts with single or multiple trainable input `[mem]` vectors.
+- pythia_avtoencoder.py - file with vanilla autoencoder pipeline
+- pythia_vae2.py - file with VAE pipeline
 
 ## Visualizations
 - `notebooks/` - Folder with notebooks used for visualizations and collecting results.
@@ -51,25 +29,3 @@ cd ./data
 This script will fetch the required texts and place them in the `./data` folder.
 
 
-### Rebuilding the Data from Source
-If you would like to preprocess the text chunks yourself or modify the process:
-
-- **PG-19**: The [preprocess_pg19.ipynb](./notebooks/preprocess_pg19.ipynb) notebook shows how we build text chunks from the original PG-19 corpus.
-- **Fanfics**: The [preprocess_fanfics.ipynb](./notebooks/preprocess_fanfics.ipynb) notebook shows how we cleaned and preprocessed HTML fanfic data. The list of the fanfic URLs is in [fanfics_urls.txt](./data/fanfics_urls.txt).
-- **Random Texts**: We generate random texts from the GloVe vocabulary. The script [make_vocab.py](./make_vocab.py) extracts the top 100k words from `glove.6B.50d.txt`:
-
-```bash
-python make_vocab.py --glove_path ./glove.6B/glove.6B.50d.txt --vocab_size 100000 --output_path ./data/vocab_100k.txt
-```
-
-## Citation
-```
-@misc{kuratov2025cramming,
-    title={Cramming 1568 Tokens into a Single Vector and Back Again: Exploring the Limits of Embedding Space Capacity},
-    author={Yuri Kuratov and Mikhail Arkhipov and Aydar Bulatov and Mikhail Burtsev},
-    year={2025},
-    eprint={2502.13063},
-    archivePrefix={arXiv},
-    primaryClass={cs.CL}
-}
-```
