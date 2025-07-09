@@ -49,7 +49,6 @@ To run Variational Autoencoder:
 python pythia_vae2.py
 ```
 
-This script will fetch the required texts and place them in the `./data` folder.
 
 
 
