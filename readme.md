@@ -28,4 +28,24 @@ cd ./data
 
 This script will fetch the required texts and place them in the `./data` folder.
 
+## Run pipelines
+### Downloading Preprocessed Data
+
+To setup:
+
+```bash
+conda env create -n my_env -f conda_env.yaml
+conda activate my_env
+
+```
+To run AE/VAE training pipelines:
+
+```bash
+python pythia_avtoencoder.py
+python pythia_vae2.py
+```
+
+This script will fetch the required texts and place them in the `./data` folder.
+
+
 
