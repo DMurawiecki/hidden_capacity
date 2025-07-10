@@ -44,7 +44,7 @@ To run Dense Experiment:
 python pythia_dense.py
 ```
 
-To run Lora Experiment you should checkout lora_exp branch and run following command:
+To run LoRA Experiment you should checkout lora_exp branch and run following command:
 
 ```bash
 python train.py
